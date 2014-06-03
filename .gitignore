@@ -20,3 +20,7 @@ share/server/main.js
 src/couch/priv/couch_js/config.h
 src/couch/priv/couchjs
 src/couch/priv/couchspawnkillable
+
+test/couchdb/run
+test/couchdb/couch_eunit.hrl
+test/couchdb/fixtures/.deps/
