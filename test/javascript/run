@@ -12,17 +12,11 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import atexit
-import contextlib as ctx
 import glob
 import optparse as op
 import os
-import re
-import select
 import subprocess as sp
 import sys
-import time
-import urllib
 
 
 USAGE = "%prog [options] [command to run...]"
@@ -33,12 +27,12 @@ N = 3
 COUCHJS = "src/couch/priv/couchjs"
 
 SCRIPTS = """
-    share/www/script/json2.js
-    share/www/script/sha1.js
-    share/www/script/oauth.js
-    share/www/script/couch.js
-    share/www/script/replicator_db_inc.js
-    share/www/script/couch_test_runner.js
+    test/javascript/json2.js
+    test/javascript/sha1.js
+    test/javascript/oauth.js
+    test/javascript/couch.js
+    test/javascript/replicator_db_inc.js
+    test/javascript/couch_test_runner.js
     test/javascript/couch_http.js
     test/javascript/test_setup.js
 """.split()
@@ -53,13 +47,15 @@ def mkformatter(tests):
     clear = "\033[0m"
     if not sys.stderr.isatty():
         green, read, clear = "", "", ""
+
     def _colorized(passed):
         if passed:
             return green + "pass" + clear
         else:
             return red + "fail" + clear
+
     def _fmt(test):
-        if isinstance(test, basestring):
+        if isinstance(test, str):
             padding = (longest - len(test)) * " "
             sys.stderr.write(test + "   " + padding)
             sys.stderr.flush()
@@ -69,24 +65,26 @@ def mkformatter(tests):
             else:
                 sys.stderr.write(_colorized(test) + os.linesep)
             sys.stderr.flush()
+
     return _fmt
 
 
 def run_couchjs(test, fmt):
     fmt(test)
-    cmd = [COUCHJS, "-H"] + SCRIPTS + [test, RUNNER]
+    cmd = [COUCHJS, "-H"] + ["-u", "test/javascript/couchdb.uri"] + SCRIPTS + [test, RUNNER]
     p = sp.Popen(
-            cmd,
-            stdin = sp.PIPE,
-            stdout = sp.PIPE,
-            stderr = sys.stderr
-        )
+        cmd,
+        stdin=sp.PIPE,
+        stdout=sp.PIPE,
+        stderr=sys.stderr
+    )
     while True:
         line = p.stdout.readline()
         if not line:
             break
+        line = line.decode()
         if line.strip() == "restart":
-            sys.stdout.write("reboot_nodes()" + os.linesep)
+            sys.stdout.write("reboot_nodes(ctx)" + os.linesep)
             sys.stdout.flush()
         else:
             sys.stderr.write(line)
@@ -97,7 +95,8 @@ def run_couchjs(test, fmt):
 def options():
     return [
         op.make_option("-s", "--start", metavar="FILENAME", default=None,
-            help="Start from the given filename if multiple files are passed")
+                       help="Start from the given filename if multiple files "
+                            "are passed")
     ]
 
 
@@ -107,14 +106,14 @@ def main():
 
     tests = []
     if not len(args):
-        args = ["share/www/script/test"]
+        args = ["test/javascript/tests"]
     for name in args:
         if os.path.isdir(name):
             tests.extend(glob.glob(os.path.join(name, "*.js")))
         elif os.path.isfile(name):
             tests.append(name)
         else:
-            pname = os.path.join("share/www/script/test", name)
+            pname = os.path.join("test/javascript/tests", name)
             if os.path.isfile(pname):
                 tests.append(pname)
             elif os.path.isfile(pname + ".js"):
@@ -133,7 +132,6 @@ def main():
     fmt = mkformatter(tests)
     for test in tests:
         run_couchjs(test, fmt)
-
 
 
 if __name__ == "__main__":
